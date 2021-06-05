@@ -11,8 +11,18 @@
 #   pip3 install apscheduler
 #   pip3 install pyserial
 
+
+
+#This code is adapted directly from 
+#  https://github.com/thien94/vision_to_mavros/blob/master/scripts/t265_to_mavlink.py
+# Same code, with many things removed and using dronekit to communicate with drone
+# Please make sure that code is understood, as this code may still may have remnants of it that are extraneous
+
+
+
+
+
 # Set the path for IDLE
-#from mavudp import *
 
 import sys
 sys.path.append("/usr/local/lib/")
@@ -52,11 +62,6 @@ def progress(string):
 # Parameters
 #######################################
 
-# Default configurations for connection to the FCU
-connection_string_default = '/dev/ttyUSB0'
-connection_baudrate_default = 921600
-connection_timeout_sec_default = 5
-
 # Transformation to convert different camera orientations to NED convention. Replace camera_orientation_default for your configuration.
 #   0: Forward, USB port to the right
 #   1: Downfacing, USB port to the right 
@@ -64,21 +69,7 @@ connection_timeout_sec_default = 5
 # Important note for downfacing camera: you need to tilt the vehicle's nose up a little - not flat - before you run the script, otherwise the initial yaw will be randomized, read here for more details: https://github.com/IntelRealSense/librealsense/issues/4080. Tilt the vehicle to any other sides and the yaw might not be as stable.
 camera_orientation_default = 0
 
-# https://mavlink.io/en/messages/common.html#VISION_POSITION_ESTIMATE
-enable_msg_vision_position_estimate = True
-vision_position_estimate_msg_hz_default = 30.0
 
-# https://mavlink.io/en/messages/ardupilotmega.html#VISION_POSITION_DELTA
-enable_msg_vision_position_delta = False
-vision_position_delta_msg_hz_default = 30.0
-
-# https://mavlink.io/en/messages/common.html#VISION_SPEED_ESTIMATE
-enable_msg_vision_speed_estimate = True
-vision_speed_estimate_msg_hz_default = 30.0
-
-# https://mavlink.io/en/messages/common.html#STATUSTEXT
-enable_update_tracking_confidence_to_gcs = True
-update_tracking_confidence_to_gcs_hz_default = 1.0
 
 # Monitor user's online input via keyboard, can only be used when runs from terminal
 enable_user_keyboard_input = True
@@ -145,64 +136,13 @@ reset_counter = 1
 #######################################
 
 parser = argparse.ArgumentParser(description='Reboots vehicle')
-parser.add_argument('--connect',
-                    help="Vehicle connection target string. If not specified, a default string will be used.")
-parser.add_argument('--baudrate', type=float,
-                    help="Vehicle connection baudrate. If not specified, a default value will be used.")
-parser.add_argument('--vision_position_estimate_msg_hz', type=float,
-                    help="Update frequency for VISION_POSITION_ESTIMATE message. If not specified, a default value will be used.")
-parser.add_argument('--vision_position_delta_msg_hz', type=float,
-                    help="Update frequency for VISION_POSITION_DELTA message. If not specified, a default value will be used.")
-parser.add_argument('--vision_speed_estimate_msg_hz', type=float,
-                    help="Update frequency for VISION_SPEED_DELTA message. If not specified, a default value will be used.")
-parser.add_argument('--scale_calib_enable', default=False, action='store_true',
-                    help="Scale calibration. Only run while NOT in flight")
-parser.add_argument('--camera_orientation', type=int,
-                    help="Configuration for camera orientation. Currently supported: forward, usb port to the right - 0; downward, usb port to the right - 1, 2: forward tilted down 45deg")
+
 parser.add_argument('--debug_enable',type=int,
                     help="Enable debug messages on terminal")
 
 args = parser.parse_args()
 
-connection_string = args.connect
-connection_baudrate = args.baudrate
-vision_position_estimate_msg_hz = args.vision_position_estimate_msg_hz
-vision_position_delta_msg_hz = args.vision_position_delta_msg_hz
-vision_speed_estimate_msg_hz = args.vision_speed_estimate_msg_hz
-scale_calib_enable = args.scale_calib_enable
-camera_orientation = args.camera_orientation
 debug_enable = args.debug_enable
-
-# Using default values if no specified inputs
-if not connection_string:
-    connection_string = connection_string_default
-    progress("INFO: Using default connection_string %s" % connection_string)
-else:
-    progress("INFO: Using connection_string %s" % connection_string)
-
-if not connection_baudrate:
-    connection_baudrate = connection_baudrate_default
-    progress("INFO: Using default connection_baudrate %s" % connection_baudrate)
-else:
-    progress("INFO: Using connection_baudrate %s" % connection_baudrate)
-
-if not vision_position_estimate_msg_hz:
-    vision_position_estimate_msg_hz = vision_position_estimate_msg_hz_default
-    progress("INFO: Using default vision_position_estimate_msg_hz %s" % vision_position_estimate_msg_hz)
-else:
-    progress("INFO: Using vision_position_estimate_msg_hz %s" % vision_position_estimate_msg_hz)
-    
-if not vision_position_delta_msg_hz:
-    vision_position_delta_msg_hz = vision_position_delta_msg_hz_default
-    progress("INFO: Using default vision_position_delta_msg_hz %s" % vision_position_delta_msg_hz)
-else:
-    progress("INFO: Using vision_position_delta_msg_hz %s" % vision_position_delta_msg_hz)
-
-if not vision_speed_estimate_msg_hz:
-    vision_speed_estimate_msg_hz = vision_speed_estimate_msg_hz_default
-    progress("INFO: Using default vision_speed_estimate_msg_hz %s" % vision_speed_estimate_msg_hz)
-else:
-    progress("INFO: Using vision_speed_estimate_msg_hz %s" % vision_speed_estimate_msg_hz)
 
 if body_offset_enabled == 1:
     progress("INFO: Using camera position offset: Enabled, x y z is %s %s %s" % (body_offset_x, body_offset_y, body_offset_z))
@@ -214,19 +154,16 @@ if compass_enabled == 1:
 else:
     progress("INFO: Using compass: Disabled")
 
-if scale_calib_enable == True:
-    progress("\nINFO: SCALE CALIBRATION PROCESS. DO NOT RUN DURING FLIGHT.\nINFO: TYPE IN NEW SCALE IN FLOATING POINT FORMAT\n")
-else:
-    if scale_factor == 1.0:
-        progress("INFO: Using default scale factor %s" % scale_factor)
-    else:
-        progress("INFO: Using scale factor %s" % scale_factor)
+# if scale_calib_enable == True:
+#     progress("\nINFO: SCALE CALIBRATION PROCESS. DO NOT RUN DURING FLIGHT.\nINFO: TYPE IN NEW SCALE IN FLOATING POINT FORMAT\n")
+# else:
+#     if scale_factor == 1.0:
+#         progress("INFO: Using default scale factor %s" % scale_factor)
+#     else:
+#         progress("INFO: Using scale factor %s" % scale_factor)
 
-if not camera_orientation:
-    camera_orientation = camera_orientation_default
-    progress("INFO: Using default camera orientation %s" % camera_orientation)
-else:
-    progress("INFO: Using camera orientation %s" % camera_orientation)
+camera_orientation = camera_orientation_default
+progress("INFO: Using default camera orientation %s" % camera_orientation)
 
 if camera_orientation == 0:     # Forward, USB port to the right
     H_aeroRef_T265Ref   = np.array([[0,0,-1,0],[1,0,0,0],[0,-1,0,0],[0,0,0,1]])
@@ -254,43 +191,6 @@ else:
 #######################################
 
 # https://mavlink.io/en/messages/common.html#VISION_POSITION_ESTIMATE
-def send_vision_position_estimate_message():
-    global current_time_us, H_aeroRef_aeroBody, reset_counter
-    with lock:
-        if H_aeroRef_aeroBody is not None:
-            #print(H_aeroRef_aeroBody[0][3], H_aeroRef_aeroBody[1][3], H_aeroRef_aeroBody[2][3])
-            # Setup angle data
-            rpy_rad = np.array( tf.euler_from_matrix(H_aeroRef_aeroBody, 'sxyz'))
-
-            # Setup covariance data, which is the upper right triangle of the covariance matrix, see here: https://files.gitter.im/ArduPilot/VisionProjects/1DpU/image.png
-            # Attemp #01: following this formula https://github.com/IntelRealSense/realsense-ros/blob/development/realsense2_camera/src/base_realsense_node.cpp#L1406-L1411
-            cov_pose    = linear_accel_cov * pow(10, 3 - int(data.tracker_confidence))
-            cov_twist   = angular_vel_cov  * pow(10, 1 - int(data.tracker_confidence))
-            covariance  = np.array([cov_pose, 0, 0, 0, 0, 0,
-                                       cov_pose, 0, 0, 0, 0,
-                                          cov_pose, 0, 0, 0,
-                                            cov_twist, 0, 0,
-                                               cov_twist, 0,
-                                                  cov_twist])
-
-            # Send the message
-            msg = vehicle.message_factory.vision_position_estimate_encode(
-                current_time_us, #us Timestamp (UNIX time or time since system boot)
-                 # H_T265Ref_T265body[0][3],
-                 # H_T265Ref_T265body[1][3],
-                 # H_T265Ref_T265body[2][3],
-                H_aeroRef_aeroBody[0][3],          #Global X position
-                H_aeroRef_aeroBody[1][3],              #Global Y position
-                H_aeroRef_aeroBody[2][3],          #Global Z position
-                rpy_rad[0],           #Roll angle
-                rpy_rad[1],          #Pitch angle
-                rpy_rad[2]            #Yaw angle
-                #covariance,              #covariance :upper right triangle (states: x, y, z, roll, pitch, ya
-                #reset_counter              #reset_counter:Estimate reset counter. 
-                )
-            vehicle.send_mavlink(msg)
-            vehicle.flush()    
-
 def send_pos():
     global current_time_us, H_aeroRef_aeroBody, reset_counter
     
@@ -331,11 +231,7 @@ def send_pos():
 
 # Send a mavlink SET_GPS_GLOBAL_ORIGIN message (http://mavlink.org/messages/common#SET_GPS_GLOBAL_ORIGIN), which allows us to use local position information without a GPS.
 def set_default_global_origin(lat,lon,alt):
-    #vehicle.location.global_frame.lat = lat
-    #vehicle.location.global_frame.long = lon
-    # time.sleep(1)
-    # vehicle.home_location=vehicle.location.global_frame
-    # time.sleep(1)
+
     msg=vehicle.message_factory.set_gps_global_origin_encode(
             0,int(lat*10000000),
             int(lon*10000000),
@@ -354,16 +250,6 @@ def set_default_global_origin(lat,lon,alt):
 
 
 
-# Request a timesync update from the flight controller, for future work.
-# TODO: Inspect the usage of timesync_update 
-def update_timesync(ts=0, tc=0):
-    if ts == 0:
-        ts = int(round(time.time() * 1000))
-    conn.mav.timesync_send(
-        tc,     # tc1
-        ts      # ts1
-    )
-
 # Listen to attitude data to acquire heading when compass data is enabled
 def att_msg_callback(self, attr_name, value):
     global heading_north_yaw
@@ -380,7 +266,7 @@ def local_pos_msg_callback(self, attr_name, value):
 #######################################
 # Functions - T265
 #######################################
-
+#Currently Not used
 def increment_reset_counter():
     global reset_counter
     if reset_counter >= 255:
@@ -441,24 +327,15 @@ vehicle.wait_ready(True, timeout=300)
 vehicle.add_attribute_listener('attitude', att_msg_callback)
 vehicle.add_attribute_listener('mode', mode_msg_callback)
 
-#vehicle = connect('tcp:192.168.2.239:5763', wait_ready=True)
-#vehicle = connect('/dev/ttyUSB0', baud=115200)
 print("\nConnected")
 
-
-# udp_conn = MAVConnection('udpin:0.0.0.0:14450')
-# vehicle._handler.pipe(udp_conn)
-# udp_conn.master.mav.srcComponent = 1  # needed to make QGroundControl work!
-# udp_conn.start()
-
-# print("Debug Stream On")
 print("Setting home")
 time.sleep(1)
 set_default_global_origin(40.44,-79.99,0)
 time.sleep(1)
 print(vehicle.location.global_frame)
 
-vehicle.mode = VehicleMode("STABILIZE")
+vehicle.mode = VehicleMode("STABILIZE") #INITIAL MODE (MANUAL FLIGHT)
 print(vehicle.battery)
 def user_input_monitor():
     global scale_factor
@@ -468,38 +345,12 @@ def user_input_monitor():
         try:
             c = input()
             if c == "":
-                vehicle.mode = VehicleMode("LAND")
-
-            # if c == "":
-            #     #send_msg_to_gcs('Set EKF home with default GPS location')
-            #     # set_default_global_origin()
-            #     # set_default_home_position()
+                vehicle.mode = VehicleMode("LAND") #HIT ENTER TO ENTER "LAND MODE"
             else:
                 progress("Got keyboard input %s" % c)
         except IOError: pass
 
-def mav_control():
-    global vehicle
-    DEFAULT_TAKEOFF_THRUST = 0.7
-    SMOOTH_TAKEOFF_THRUST = 0.6
-    aTargetAltitude = 1
 
-    count = 0
-    while True:
-        if vehicle.ekf_ok:
-            if count == 0:
-                print("ARMING")
-                vehicle.armed = True
-                # while not vehicle.armed:
-                #     time.sleep(0.01)
-                print("TAKEOFF")
-                loc = vehicle.location.global_frame.alt
-                vehicle.simple_takeoff(loc+1)
-            count+=1
-
-
-#mavlink_thread = threading.Thread(target=mavlink_loop, args=(conn, mavlink_callbacks))
-#mavlink_thread.start()
 
 # connecting and configuring the camera is a little hit-and-miss.
 # Start a timer and rely on a restart of the script to get it working.
@@ -515,27 +366,6 @@ realsense_connect()
 
 signal.setitimer(signal.ITIMER_REAL, 0)  # cancel alarm
 
-# Send MAVlink messages in the background at pre-determined frequencies
-# sched = BackgroundScheduler()
-
-# if enable_msg_vision_position_estimate:
-#     sched.add_job(send_vision_position_estimate_message, 'interval', seconds = 1/vision_position_estimate_msg_hz)
-
-# if enable_msg_vision_position_delta:
-#     sched.add_job(send_vision_position_delta_message, 'interval', seconds = 1/vision_position_delta_msg_hz)
-#     send_vision_position_delta_message.H_aeroRef_PrevAeroBody = tf.quaternion_matrix([1,0,0,0]) 
-#     send_vision_position_delta_message.prev_time_us = int(round(time.time() * 1000000))
-
-# if enable_msg_vision_speed_estimate:
-#     sched.add_job(send_vision_speed_estimate_message, 'interval', seconds = 1/vision_speed_estimate_msg_hz)
-
-# if enable_update_tracking_confidence_to_gcs:
-#     sched.add_job(update_tracking_confidence_to_gcs, 'interval', seconds = 1/update_tracking_confidence_to_gcs_hz_default)
-#     update_tracking_confidence_to_gcs.prev_confidence_level = -1
-
-# mav_control_thread = threading.Thread(target = mav_control)
-# mav_control_thread.daemon = True
-# mav_control_thread.start()
 
 #A separate thread to monitor user input
 if enable_user_keyboard_input:
@@ -543,7 +373,6 @@ if enable_user_keyboard_input:
     user_keyboard_input_thread.daemon = True
     user_keyboard_input_thread.start()
 
-# sched.start()
 
 # gracefully terminate the script if an interrupt signal (e.g. ctrl-c)
 # is received.  This is considered to be abnormal termination.
@@ -565,9 +394,14 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 
 if compass_enabled == 1:
     time.sleep(1) # Wait a short while for yaw to be correctly initiated
-#f = open("t265Log.txt", "w")
-#send_msg_to_gcs('Sending vision messages to FCU')
+
+
+if debug_enable: f = open("t265Log.txt", "w") #Position Txt file for logging
+
 counter = 0
+##############################################################
+# MAIN LOOP - MOST IMPORTANT
+##############################################################
 try:
     while not main_loop_should_quit:
         # Wait for the next set of frames from the camera
@@ -604,7 +438,7 @@ try:
                 V_aeroRef_aeroBody[2][3] = data.velocity.z
                 V_aeroRef_aeroBody = H_aeroRef_T265Ref.dot(V_aeroRef_aeroBody)
                 s = str(time.time()) + " " + str(data.translation.x) + " " + str(data.translation.y) + " " + str(data.translation.z)
-                #f.write(s + "\n")
+                if debug_enable: f.write(s + "\n")
 
                 # Check for pose jump and increment reset_counter
                 if prev_data != None:
@@ -638,27 +472,31 @@ try:
                 # Realign heading to face north using initial compass data
                 if compass_enabled == 1:
                     H_aeroRef_aeroBody = H_aeroRef_aeroBody.dot( tf.euler_matrix(0, 0, heading_north_yaw, 'sxyz'))
-                #send_vision_position_estimate_message()
-                send_pos()
-                #print("here")
-                time.sleep(0.03)
-                print(vehicle.battery)
 
-                print(s + "\n")
+
+                #####################################
+                # Send Pos to Drone, then sleep until next loop (done 30hz right now)
+                #####################################
+                send_pos()
+                time.sleep(0.03) #30hz
+                
                 # Show debug messages here
                 if debug_enable == 1:
-
+                    print(vehicle.battery)
+                    print(s + "\n")
                     #os.system('clear') # This helps in displaying the messages to be more readable
-                    progress(str(time.time()) + "  t265: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz'))))
+                    #progress(str(time.time()) + "  t265: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz'))))
                     # progress("DEBUG: Raw RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_T265Ref_T265body, 'sxyz')) * 180 / m.pi))
                     # progress("DEBUG: NED RPY[deg]: {}".format( np.array( tf.euler_from_matrix( H_aeroRef_aeroBody, 'sxyz')) * 180 / m.pi))
                     # progress("DEBUG: Raw pos xyz : {}".format( np.array( [data.translation.x, data.translation.y, data.translation.z])))
                     # progress("DEBUG: NED pos xyz : {}".format( np.array( tf.translation_from_matrix( H_aeroRef_aeroBody))))
-
                 if vehicle.ekf_ok:
                     if counter == 0:
-                        print("ARMING")
-                        #vehicle.armed=True
+                        print("POS LOCK") #drone EKF has good confidence, ok to start flying now
+
+                        #Below code is dronekit code for autonomous takeoff - Must be in Guided mode to use (Seen strange behaviour when doing this previously)
+                        
+                        #vehicle.armed=True                 
                         #while not vehicle.armed:
                             #time.sleep(0.01)
                         #vehicle.simple_takeoff(1)
