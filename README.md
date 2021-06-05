@@ -16,3 +16,10 @@ and adapted to use dronekit and without some extra features, make sure that code
 
 When Debug Enabled in the script, messages are printed to console, and t265 data is logged to text file. The other python file t265graph.py, where the filename of the text file in the first line of code can be changed to graph the t265 xyz data.
 
+Current Issues:
+
+Drone Climbs/Falls when set to "LOITER" Mode after taking off manually
+Possible Fixes:
+1. Don't use Loiter - Stay in stabilize and have code write manual attitude/thrust commands
+2. Change Drone Paramters to change alt source
+3. Change altitude being sent to drone from code (send_pos function)
